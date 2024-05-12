@@ -1,5 +1,5 @@
 import { Directive, HostListener } from '@angular/core';
-import { Curtains, Plane, Vec2 } from 'curtainsjs';
+import { Curtains, Plane, PlaneParams, Vec2 } from 'curtainsjs';
 
 @Directive({
   selector: '[appCurtainsJs]',
@@ -14,19 +14,19 @@ export class CurtainsJsDirective {
     const mouseLastPosition = new Vec2();
 
     const deltas = {
-        max: 0,
-        applied: 0,
+      max: 0,
+      applied: 0,
     };
 
     // set up our WebGL context and append the canvas to our wrapper
     const curtains = new Curtains({
-        container: "canvas",
-        watchScroll: false, // no need to listen for the scroll in this example
-        pixelRatio: Math.min(1.5, window.devicePixelRatio) // limit pixel ratio for performance
+      container: 'canvas',
+      watchScroll: false, // no need to listen for the scroll in this example
+      pixelRatio: Math.min(1.5, window.devicePixelRatio), // limit pixel ratio for performance
     });
 
     // get our plane element
-    const planeElements = document.getElementsByClassName("curtain");
+    const planeElements = document.getElementsByClassName('curtain');
 
     const vs = `
         precision mediump float;
@@ -105,62 +105,72 @@ export class CurtainsJsDirective {
     `;
 
     // some basic parameters
-    const params = {
-        vertexShader: vs,
-        fragmentShader: fs,
-        widthSegments: 20,
-        heightSegments: 20,
-        uniforms: {
-            resolution: { // resolution of our plane
-                name: "uResolution",
-                type: "2f", // notice this is an length 2 array of floats
-                value: [planeElements[0].clientWidth, planeElements[0].clientHeight],
-            },
-            time: { // time uniform that will be updated at each draw call
-                name: "uTime",
-                type: "1f",
-                value: 0,
-            },
-            mousePosition: { // our mouse position
-                name: "uMousePosition",
-                type: "2f", // again an array of floats
-                value: mousePosition,
-            },
-            mouseMoveStrength: { // the mouse move strength
-                name: "uMouseMoveStrength",
-                type: "1f",
-                value: 0,
-            }
+    const params: PlaneParams = {
+      vertexShader: vs,
+      fragmentShader: fs,
+      widthSegments: 20,
+      heightSegments: 20,
+      uniforms: {
+        resolution: {
+          // resolution of our plane
+          name: 'uResolution',
+          type: '2f', // notice this is an length 2 array of floats
+          value: [planeElements[0].clientWidth, planeElements[0].clientHeight],
         },
+        time: {
+          // time uniform that will be updated at each draw call
+          name: 'uTime',
+          type: '1f',
+          value: 0,
+        },
+        mousePosition: {
+          // our mouse position
+          name: 'uMousePosition',
+          type: '2f', // again an array of floats
+          value: mousePosition,
+        },
+        mouseMoveStrength: {
+          // the mouse move strength
+          name: 'uMouseMoveStrength',
+          type: '1f',
+          value: 0,
+        },
+      },
     };
 
     // create our plane
-    const simplePlane = new Plane(curtains, planeElements[0], params as any);
+    const simplePlane = new Plane(curtains, planeElements[0], params);
 
-    simplePlane.onReady(() => {
+    simplePlane
+      .onReady(() => {
         // display the button
-        document.body.classList.add("curtains-ready");
+        document.body.classList.add('curtains-ready');
 
         // set a fov of 35 to reduce perspective (we could have used the fov init parameter)
-        simplePlane.setPerspective(135);
+        simplePlane.setPerspective(105);
 
         // now that our plane is ready we can listen to mouse move event
-        const wrapper = document.getElementById("page-wrap");
+        const wrapper = document.getElementById('page-wrap');
 
-        wrapper?.addEventListener("mousemove", (e) => {
-            handleMovement(e, simplePlane);
+        wrapper?.addEventListener('mousemove', (e) => {
+          handleMovement(e, simplePlane);
         });
 
-        wrapper?.addEventListener("touchmove", (e) => {
+        wrapper?.addEventListener(
+          'touchmove',
+          (e) => {
             handleMovement(e, simplePlane);
-        }, {
-            passive: true
-        });
+          },
+          {
+            passive: true,
+          }
+        );
 
-        document.body.classList.add("video-started");
-        deltas.max = 2;
+        document.body.classList.add('video-started');
+        deltas.max = 3;
         simplePlane.playVideos();
-    }).onRender(() => {
+      })
+      .onRender(() => {
         // increment our time uniform
         (simplePlane.uniforms['time'].value as number)++;
 
@@ -170,49 +180,57 @@ export class CurtainsJsDirective {
 
         // send the new mouse move strength value
         // send the new mouse move strength value
-      simplePlane.uniforms['mouseMoveStrength'].value = deltas.applied;
-
-    }).onAfterResize(() => {
+        simplePlane.uniforms['mouseMoveStrength'].value = deltas.applied;
+      })
+      .onAfterResize(() => {
         const planeBoundingRect = simplePlane.getBoundingRect();
         console.log(planeBoundingRect);
-        simplePlane.uniforms['resolution'].value = [planeBoundingRect.width, planeBoundingRect.height];
-    });
+        simplePlane.uniforms['resolution'].value = [
+          planeBoundingRect.width,
+          planeBoundingRect.height,
+        ];
+      });
 
     // handle the mouse move event
-     function handleMovement(e: any, plane: Plane) {
-        // update mouse last pos
-        mouseLastPosition.copy(mousePosition);
+    function handleMovement(e: any, plane: Plane) {
+      // update mouse last pos
+      mouseLastPosition.copy(mousePosition);
 
-        const mouse = new Vec2();
+      const mouse = new Vec2();
 
-        // touch event
-        if(e.targetTouches) {
-            mouse.set(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
+      // touch event
+      if (e.targetTouches) {
+        mouse.set(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
+      }
+      // mouse event
+      else {
+        mouse.set(e.clientX, e.clientY);
+      }
+
+      // lerp the mouse position a bit to smoothen the overall effect
+      mousePosition.set(
+        curtains.lerp(mousePosition.x, mouse.x, 0.3),
+        curtains.lerp(mousePosition.y, mouse.y, 0.3)
+      );
+
+      // convert our mouse/touch position to coordinates relative to the vertices of the plane and update our uniform
+      // convert our mouse/touch position to coordinates relative to the vertices of the plane and update our uniform
+      plane.uniforms['mousePosition'].value =
+        plane.mouseToPlaneCoords(mousePosition);
+
+      // calculate the mouse move strength
+      if (mouseLastPosition.x && mouseLastPosition.y) {
+        let delta =
+          Math.sqrt(
+            Math.pow(mousePosition.x - mouseLastPosition.x, 2) +
+              Math.pow(mousePosition.y - mouseLastPosition.y, 2)
+          ) / 30;
+        delta = Math.min(4, delta);
+        // update max delta only if it increased
+        if (delta >= deltas.max) {
+          deltas.max = delta;
         }
-        // mouse event
-        else {
-            mouse.set(e.clientX, e.clientY);
-        }
-
-        // lerp the mouse position a bit to smoothen the overall effect
-        mousePosition.set(
-            curtains.lerp(mousePosition.x, mouse.x, 0.3),
-            curtains.lerp(mousePosition.y, mouse.y, 0.3)
-        );
-
-        // convert our mouse/touch position to coordinates relative to the vertices of the plane and update our uniform
-        // convert our mouse/touch position to coordinates relative to the vertices of the plane and update our uniform
-       plane.uniforms['mousePosition'].value = plane.mouseToPlaneCoords(mousePosition);
-
-        // calculate the mouse move strength
-        if(mouseLastPosition.x && mouseLastPosition.y) {
-            let delta = Math.sqrt(Math.pow(mousePosition.x - mouseLastPosition.x, 2) + Math.pow(mousePosition.y - mouseLastPosition.y, 2)) / 30;
-            delta = Math.min(4, delta);
-            // update max delta only if it increased
-            if(delta >= deltas.max) {
-                deltas.max = delta;
-            }
-        }
+      }
     }
   }
 }
